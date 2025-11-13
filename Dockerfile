@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/playwright:v1.48.0-jammy
+FROM mcr.microsoft.com/playwright:v1.56.1-jammy
 
 # Install gcloud CLI (for uploading reports)
 RUN apt-get update && apt-get install -y curl gnupg \
