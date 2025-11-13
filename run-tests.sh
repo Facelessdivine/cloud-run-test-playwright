@@ -5,7 +5,9 @@ set -euo pipefail
 IDX=$(( ${CLOUD_RUN_TASK_INDEX:-0} + 1 ))  # 1-based index for Playwright
 CNT=${CLOUD_RUN_TASK_COUNT:-1}
 
-RUN_ID=${RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}
+# Prefer explicit RUN_ID, otherwise use Cloud Run execution id, otherwise fallback to timestamp
+RUN_ID=${RUN_ID:-${CLOUD_RUN_EXECUTION:-$(date -u +%Y%m%dT%H%M%SZ)}}
+
 BUCKET=${BUCKET:-"gs://pw-artifacts-demo-1763046256"}  # default
 
 # Trim whitespace, normalize BUCKET
