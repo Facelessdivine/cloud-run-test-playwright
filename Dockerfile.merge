@@ -1,5 +1,5 @@
 # Dockerfile.merge
-FROM mcr.microsoft.com/playwright:v1.48.0-jammy
+FROM mcr.microsoft.com/playwright:v1.56.1-jammy
 
 RUN apt-get update && apt-get install -y curl gnupg \
  && echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" \
