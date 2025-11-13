@@ -7,21 +7,20 @@ RUN apt-get update && apt-get install -y curl gnupg \
  && curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
     | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg \
  && apt-get update && apt-get install -y google-cloud-cli \
-    && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# 1) Install deps (Node)
+# Install Node deps
 COPY package*.json ./
 RUN npm ci
 
-# 2) 🔴 INSTALL PLAYWRIGHT BROWSERS INSIDE THE IMAGE
+# Make sure browsers for 1.56.1 are installed
 RUN npx playwright install --with-deps
 
-# 3) Copy your tests + config
+# Copy your tests + config
 COPY . .
 
-# 4) Ensure runner script is executable
 RUN chmod +x run-tests.sh
 
 ENTRYPOINT ["bash", "./run-tests.sh"]
