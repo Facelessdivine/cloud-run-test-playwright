@@ -1,0 +1,20 @@
+{
+  "name": "pw-cloud-run-demo",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:ci": "bash ./run-tests.sh",
+    "report:merge": "bash ./merge-reports.sh"
+  },
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "@types/node": "^24.10.1"
+  }
+}
