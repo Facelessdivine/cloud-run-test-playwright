@@ -19,16 +19,23 @@ find ./blob -type d -name blob-report -print0 | while IFS= read -r -d '' d; do
   cp -R "$d"/. "./all-blob/${shard_name}/"
 done
 
-echo "Merging reports…"
+echo "Merging Playwright reports..."
 
-# HTML report
+# 1. Merge and generate the HTML folder
 npx playwright merge-reports --reporter html ./all-blob
-# JUnit report
-npx playwright merge-reports --reporter junit ./all-blob
 
-# Upload final unified reports
+# 2. Merge and REDIRECT the output to a file (the critical fix)
+npx playwright merge-reports --reporter junit ./all-blob > ./results.xml
+
+echo "Uploading merged reports..."
+# Upload the HTML folder
 gcloud storage rsync --recursive ./playwright-report "${BUCKET}/runs/${RUN_ID}/final/html"
+echo "Upload complete..."
+echo $BUCKET
+echo $RUN_ID
+# Upload the XML file (this will now find the file)
 gcloud storage cp ./results.xml "${BUCKET}/runs/${RUN_ID}/final/junit.xml"
+
 
 echo "DONE:"
 echo "  HTML:  ${BUCKET}/runs/${RUN_ID}/final/html/index.html"
