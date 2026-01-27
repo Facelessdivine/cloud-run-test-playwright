@@ -19,24 +19,29 @@ find ./blob -type d -name blob-report -print0 | while IFS= read -r -d '' d; do
   cp -R "$d"/. "./all-blob/${shard_name}/"
 done
 
-echo "Merging Playwright reports..."
+# Inside the Coordinator shard block (IDX == 1)
+WORK="/merge"
+mkdir -p "$WORK/all-blob"
+cd "$WORK"
 
-# 1. Merge and generate the HTML folder
-npx playwright merge-reports --reporter html ./all-blob
+echo "Merging reports..."
+# Explicitly use the directory as the last argument
+npx playwright merge-reports --reporter html "$WORK/all-blob"
+npx playwright merge-reports --reporter junit "$WORK/all-blob" > "$WORK/results.xml"
 
-# 2. Merge and REDIRECT the output to a file (the critical fix)
-npx playwright merge-reports --reporter junit ./all-blob > ./results.xml
+
+# DEBUG: List files to see exactly what was created
+echo "Files in $WORK:"
+ls -lh "$WORK"
+
+# Check if file exists before trying to upload
+if [[ ! -f "$WORK/results.xml" ]]; then
+  echo "ERROR: $WORK/results.xml was not found. Merge command likely failed."
+  exit 1
+fi
 
 echo "Uploading merged reports..."
-# Upload the HTML folder
-gcloud storage rsync --recursive ./playwright-report "${BUCKET}/runs/${RUN_ID}/final/html"
-echo "Upload complete..."
-echo $BUCKET
-echo $RUN_ID
-# Upload the XML file (this will now find the file)
-gcloud storage cp ./results.xml "${BUCKET}/runs/${RUN_ID}/final/junit.xml"
+gcloud storage rsync --recursive "$WORK/playwright-report" "${BUCKET}/runs/${RUN_ID}/final/html"
+gcloud storage cp "$WORK/results.xml" "${BUCKET}/runs/${RUN_ID}/final/junit.xml"
 
-
-echo "DONE:"
-echo "  HTML:  ${BUCKET}/runs/${RUN_ID}/final/html/index.html"
 echo "  JUnit: ${BUCKET}/runs/${RUN_ID}/final/junit.xml"
