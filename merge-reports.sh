@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
+echo "changes worked" 
 RUN_ID=${RUN_ID:?must set RUN_ID}
 BUCKET=${BUCKET:?must set BUCKET (gs://...)}
 
