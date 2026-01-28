@@ -7,7 +7,7 @@ RUN_ID=${RUN_ID:-pw-tests-$(date +%s)}
 SHARD_INDEX=${SHARD_INDEX:-1}
 SHARD_TOTAL=${SHARD_TOTAL:-1}
 BUCKET=${BUCKET:?BUCKET env var required}
-
+BUCKET="pw-artifacts-demo-1763046256"
 export RUN_ID
 export SHARD_INDEX
 export SHARD_TOTAL
