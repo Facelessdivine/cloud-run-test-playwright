@@ -5,26 +5,93 @@ set -euo pipefail
 # Shard info from Cloud Run Jobs
 ############################################
 
-IDX=$(( ${CLOUD_RUN_TASK_INDEX:-0} + 1 ))  # Playwright shards are 1-based
+IDX=$(( ${CLOUD_RUN_TASK_INDEX:-0} + 1 ))
 CNT=${CLOUD_RUN_TASK_COUNT:-1}
 
 RUN_ID=${RUN_ID:-${CLOUD_RUN_EXECUTION:-$(date -u +%Y%m%dT%H%M%SZ)}}
-BUCKET=${BUCKET:-"gs://pw-artifacts-demo-1763046256"}
+BUCKET=${BUCKET:?ERROR: BUCKET env var is required}
 
 BUCKET="$(echo -n "$BUCKET" | xargs)"
 [[ "$BUCKET" != gs://* ]] && BUCKET="gs://${BUCKET}"
+BUCKET_NAME="${BUCKET#gs://}"
 
 echo "===================================================="
-echo "🚀 PW SHARD ${IDX}/${CNT}"
+echo "🚀 Playwright shard ${IDX}/${CNT}"
 echo "RUN_ID=${RUN_ID}"
 echo "BUCKET=${BUCKET}"
 echo "===================================================="
 
 ############################################
-# 1) Run this shard's tests
+# Helper: upload directory to GCS via Node SDK
 ############################################
 
-echo "🧪 Running Playwright shard ${IDX}/${CNT}..."
+upload_dir() {
+  local src="$1"
+  local dest="$2"
+
+  node <<EOF
+const { Storage } = require('@google-cloud/storage');
+const fs = require('fs');
+const path = require('path');
+
+const bucketName = "${BUCKET_NAME}";
+const prefix = "${dest}";
+const storage = new Storage();
+
+function walk(dir) {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap(d =>
+    d.isDirectory() ? walk(path.join(dir, d.name)) : [path.join(dir, d.name)]
+  );
+}
+
+(async () => {
+  const files = walk("${src}");
+  for (const f of files) {
+    const rel = path.relative("${src}", f);
+    const destPath = prefix + '/' + rel;
+    await storage.bucket(bucketName).upload(f, { destination: destPath });
+    console.log("Uploaded:", destPath);
+  }
+})();
+EOF
+}
+
+############################################
+# Helper: download prefix from GCS
+############################################
+
+download_prefix() {
+  local prefix="$1"
+  local dest="$2"
+
+  node <<EOF
+const { Storage } = require('@google-cloud/storage');
+const fs = require('fs');
+const path = require('path');
+
+const bucketName = "${BUCKET_NAME}";
+const prefix = "${prefix}";
+const dest = "${dest}";
+const storage = new Storage();
+
+(async () => {
+  const [files] = await storage.bucket(bucketName).getFiles({ prefix });
+  for (const f of files) {
+    if (f.name.endsWith('/')) continue;
+    const out = path.join(dest, f.name.replace(prefix, ''));
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    await f.download({ destination: out });
+    console.log("Downloaded:", f.name);
+  }
+})();
+EOF
+}
+
+############################################
+# 1) Run this shard
+############################################
+
+echo "🧪 Running Playwright tests..."
 npx playwright test \
   --shard="${IDX}/${CNT}" \
   --workers=1 \
@@ -34,16 +101,16 @@ npx playwright test \
 # 2) Upload blob report
 ############################################
 
-DEST="${BUCKET}/runs/${RUN_ID}/blob/shard-${IDX}"
-echo "📤 Uploading blob-report to ${DEST}"
-gcloud storage rsync --recursive ./blob-report "$DEST"
+DEST_PREFIX="runs/${RUN_ID}/blob/shard-${IDX}"
+echo "📤 Uploading blob-report to gs://${BUCKET_NAME}/${DEST_PREFIX}"
+upload_dir "./blob-report" "$DEST_PREFIX"
 
 ############################################
-# 3) Coordinator shard (IDX == 1) merges all
+# 3) Coordinator shard merges all
 ############################################
 
 if [[ "$IDX" -eq 1 ]]; then
-  echo "👑 Coordinator shard. Waiting for ${CNT} shards..."
+  echo "👑 Coordinator shard — waiting for ${CNT} shards..."
 
   WORK="/merge"
   mkdir -p "$WORK/all-blob"
@@ -54,14 +121,23 @@ if [[ "$IDX" -eq 1 ]]; then
   waited=0
 
   while true; do
-    echo "🔍 Checking shard folders in ${BUCKET}/runs/${RUN_ID}/blob/..."
-    shard_count=$(gcloud storage ls "${BUCKET}/runs/${RUN_ID}/blob/" | grep -c "shard-") || true
+    echo "🔍 Checking shard folders..."
+    shard_count=$(node <<EOF
+const { Storage } = require('@google-cloud/storage');
+const storage = new Storage();
+const [files] = await storage.bucket("${BUCKET_NAME}")
+  .getFiles({ prefix: "runs/${RUN_ID}/blob/shard-" });
+const shards = new Set(files.map(f => f.name.split('/')[3]));
+console.log(shards.size);
+EOF
+) || true
+
     echo "Found ${shard_count}/${CNT} shards"
 
     [[ "$shard_count" -ge "$CNT" ]] && break
 
     if [[ "$waited" -ge "$max_wait_seconds" ]]; then
-      echo "❌ ERROR: Timeout waiting for all shards."
+      echo "❌ ERROR: Timeout waiting for shards."
       exit 1
     fi
 
@@ -70,21 +146,21 @@ if [[ "$IDX" -eq 1 ]]; then
   done
 
   ############################################
-  # Download all blobs
+  # Download blobs
   ############################################
 
-  echo "📥 Downloading all shard blobs..."
-  gcloud storage rsync --recursive "${BUCKET}/runs/${RUN_ID}/blob" ./blob
+  echo "📥 Downloading shard blobs..."
+  download_prefix "runs/${RUN_ID}/blob/" "./blob"
 
   ############################################
-  # Flatten ZIPs for merge
+  # Flatten zip files
   ############################################
 
-  echo "📦 Collecting .zip files..."
+  echo "📦 Collecting blob zip files..."
   find ./blob -type f -name '*.zip' -exec cp {} ./all-blob/ \;
 
   if [[ -z "$(ls -A ./all-blob)" ]]; then
-    echo "❌ ERROR: No blob zip files found for merge."
+    echo "❌ ERROR: No blob zip files found."
     exit 1
   fi
 
@@ -106,15 +182,21 @@ if [[ "$IDX" -eq 1 ]]; then
   ############################################
 
   echo "📤 Uploading merged HTML..."
-  gcloud storage rsync --recursive ./playwright-report "${BUCKET}/runs/${RUN_ID}/final/html"
+  upload_dir "./playwright-report" "runs/${RUN_ID}/final/html"
 
   echo "📤 Uploading merged JUnit..."
-  gcloud storage cp ./results.xml "${BUCKET}/runs/${RUN_ID}/final/junit.xml"
+  node <<EOF
+const { Storage } = require('@google-cloud/storage');
+const storage = new Storage();
+await storage.bucket("${BUCKET_NAME}")
+  .upload("./results.xml", { destination: "runs/${RUN_ID}/final/junit.xml" });
+console.log("Uploaded results.xml");
+EOF
 
   echo "===================================================="
   echo "✅ MERGE COMPLETED"
-  echo "🔗 HTML:  ${BUCKET}/runs/${RUN_ID}/final/html/index.html"
-  echo "🔗 JUnit: ${BUCKET}/runs/${RUN_ID}/final/junit.xml"
+  echo "🔗 HTML:  gs://${BUCKET_NAME}/runs/${RUN_ID}/final/html/index.html"
+  echo "🔗 JUnit: gs://${BUCKET_NAME}/runs/${RUN_ID}/final/junit.xml"
   echo "===================================================="
 else
   echo "Shard ${IDX}/${CNT} finished — merge handled by shard 1."
