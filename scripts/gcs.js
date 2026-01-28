@@ -4,33 +4,31 @@ import path from "path";
 
 const storage = new Storage();
 
+function walk(dir) {
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .flatMap((d) =>
+      d.isDirectory() ? walk(path.join(dir, d.name)) : [path.join(dir, d.name)],
+    );
+}
+
 export async function uploadDir(bucketName, srcDir, destPrefix) {
-  const bucket = storage.bucket(bucketName);
-
-  async function walk(dir) {
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-    const files = [];
-    for (const e of entries) {
-      const p = path.join(dir, e.name);
-      if (e.isDirectory()) files.push(...(await walk(p)));
-      else files.push(p);
-    }
-    return files;
-  }
-
-  const files = await walk(srcDir);
+  const files = walk(srcDir);
   for (const f of files) {
     const rel = path.relative(srcDir, f);
-    const dest = path.posix.join(destPrefix, rel);
-    await bucket.upload(f, { destination: dest });
+    const dest = `${destPrefix}/${rel}`;
+    await storage.bucket(bucketName).upload(f, { destination: dest });
     console.log("Uploaded:", dest);
   }
 }
 
-export async function downloadPrefix(bucketName, prefix, destDir) {
-  const bucket = storage.bucket(bucketName);
-  const [files] = await bucket.getFiles({ prefix });
+export async function uploadFile(bucketName, filePath, destPath) {
+  await storage.bucket(bucketName).upload(filePath, { destination: destPath });
+  console.log("Uploaded:", destPath);
+}
 
+export async function downloadPrefix(bucketName, prefix, destDir) {
+  const [files] = await storage.bucket(bucketName).getFiles({ prefix });
   for (const f of files) {
     if (f.name.endsWith("/")) continue;
     const out = path.join(destDir, f.name.replace(prefix, ""));
@@ -41,12 +39,11 @@ export async function downloadPrefix(bucketName, prefix, destDir) {
 }
 
 export async function countShardFolders(bucketName, runId) {
-  const bucket = storage.bucket(bucketName);
-  const [files] = await bucket.getFiles({
-    prefix: `runs/${runId}/blob/shard-`,
-  });
-  const shards = new Set(files.map((f) => f.name.split("/")[3]));
-  return shards.size;
+  const [files] = await storage
+    .bucket(bucketName)
+    .getFiles({ prefix: `runs/${runId}/blob/shard-` });
+
+  return new Set(files.map((f) => f.name.split("/")[3])).size;
 }
 if (process.argv[2]) {
   const [, , cmd, bucket, ...args] = process.argv;
