@@ -2,6 +2,11 @@
 set -euo pipefail
 
 ############################################
+# Ensure Node can resolve deps from /app
+############################################
+export NODE_PATH=/app/node_modules
+
+############################################
 # Shard info from Cloud Run Jobs
 ############################################
 
@@ -29,7 +34,7 @@ upload_dir() {
   local src="$1"
   local dest="$2"
 
-  node <<EOF
+  node --input-type=module <<EOF
 import { Storage } from '@google-cloud/storage';
 import fs from 'fs';
 import path from 'path';
@@ -62,7 +67,7 @@ download_prefix() {
   local prefix="$1"
   local dest="$2"
 
-  node <<EOF
+  node --input-type=module <<EOF
 import { Storage } from '@google-cloud/storage';
 import fs from 'fs';
 import path from 'path';
@@ -118,7 +123,7 @@ if [[ "$IDX" -eq 1 ]]; then
 
   while true; do
     echo "🔍 Checking shard folders..."
-    shard_count=$(node <<EOF
+    shard_count=$(node --input-type=module <<EOF
 import { Storage } from '@google-cloud/storage';
 const storage = new Storage();
 const [files] = await storage.bucket("${BUCKET_NAME}")
@@ -181,7 +186,7 @@ EOF
   upload_dir "./playwright-report" "runs/${RUN_ID}/final/html"
 
   echo "📤 Uploading merged JUnit..."
-  node <<EOF
+  node --input-type=module <<EOF
 import { Storage } from '@google-cloud/storage';
 const storage = new Storage();
 await storage.bucket("${BUCKET_NAME}")
