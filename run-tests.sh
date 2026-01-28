@@ -7,8 +7,8 @@ set -euo pipefail
 
 IDX=$(( ${CLOUD_RUN_TASK_INDEX:-0} + 1 ))
 CNT=${CLOUD_RUN_TASK_COUNT:-1}
-BUCKET="pw-artifacts-demo-1763046256"
 RUN_ID=${RUN_ID:-${CLOUD_RUN_EXECUTION:-$(date -u +%Y%m%dT%H%M%SZ)}}
+BUCKET=${BUCKET:?ERROR: BUCKET env var is required}
 
 BUCKET="$(echo -n "$BUCKET" | xargs)"
 [[ "$BUCKET" != gs://* ]] && BUCKET="gs://${BUCKET}"
@@ -37,7 +37,10 @@ npx playwright test \
 DEST_PREFIX="runs/${RUN_ID}/blob/shard-${IDX}"
 echo "📤 Uploading blob-report to gs://${BUCKET_NAME}/${DEST_PREFIX}"
 
-node scripts/gcs.js upload "$BUCKET_NAME" "./blob-report" "$DEST_PREFIX"
+node <<EOF
+import { uploadDir } from './scripts/gcs.js';
+await uploadDir("${BUCKET_NAME}", "./blob-report", "${DEST_PREFIX}");
+EOF
 
 ############################################
 # 3) Coordinator shard merges all
@@ -47,7 +50,7 @@ if [[ "$IDX" -eq 1 ]]; then
   echo "👑 Coordinator shard — waiting for ${CNT} shards..."
 
   WORK="/merge"
-  mkdir -p "$WORK/blob" "$WORK/all-blob"
+  mkdir -p "$WORK/all-blob"
   cd "$WORK"
 
   max_wait_seconds=1800
@@ -56,7 +59,12 @@ if [[ "$IDX" -eq 1 ]]; then
 
   while true; do
     echo "🔍 Checking shard folders..."
-    shard_count=$(node /app/scripts/gcs.js count "$BUCKET_NAME" "$RUN_ID") || true
+    shard_count=$(node <<EOF
+import { countShardFolders } from '/app/scripts/gcs.js';
+console.log(await countShardFolders("${BUCKET_NAME}", "${RUN_ID}"));
+EOF
+) || true
+
     echo "Found ${shard_count}/${CNT} shards"
 
     [[ "$shard_count" -ge "$CNT" ]] && break
@@ -75,7 +83,10 @@ if [[ "$IDX" -eq 1 ]]; then
   ############################################
 
   echo "📥 Downloading shard blobs..."
-  node /app/scripts/gcs.js download "$BUCKET_NAME" "runs/${RUN_ID}/blob/" "./blob"
+  node <<EOF
+import { downloadPrefix } from '/app/scripts/gcs.js';
+await downloadPrefix("${BUCKET_NAME}", "runs/${RUN_ID}/blob/", "./blob");
+EOF
 
   ############################################
   # Flatten zip files
@@ -107,10 +118,16 @@ if [[ "$IDX" -eq 1 ]]; then
   ############################################
 
   echo "📤 Uploading merged HTML..."
-  node /app/scripts/gcs.js upload "$BUCKET_NAME" "./playwright-report" "runs/${RUN_ID}/final/html"
+  node <<EOF
+import { uploadDir } from '/app/scripts/gcs.js';
+await uploadDir("${BUCKET_NAME}", "./playwright-report", "runs/${RUN_ID}/final/html");
+EOF
 
   echo "📤 Uploading merged JUnit..."
-  node /app/scripts/gcs.js upload "$BUCKET_NAME" "./results.xml" "runs/${RUN_ID}/final/junit.xml"
+  node <<EOF
+import { uploadFile } from '/app/scripts/gcs.js';
+await uploadFile("${BUCKET_NAME}", "./results.xml", "runs/${RUN_ID}/final/junit.xml");
+EOF
 
   echo "===================================================="
   echo "✅ MERGE COMPLETED"
