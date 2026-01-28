@@ -26,6 +26,10 @@ export async function uploadFile(bucketName, filePath, destPath) {
   await storage.bucket(bucketName).upload(filePath, { destination: destPath });
   console.log("Uploaded:", destPath);
 }
+export async function deleteFile(bucketName, filePath) {
+  await storage.bucket(bucketName).file(filePath).delete();
+  console.log("Deleted:", filePath);
+}
 
 export async function downloadPrefix(bucketName, prefix, destDir) {
   const [files] = await storage.bucket(bucketName).getFiles({ prefix });

@@ -23,9 +23,9 @@ export default defineConfig({
     /* 🔵 OPTIMIZACIÓN: Trace y Video */
     // En Cloud Run, el almacenamiento es efímero.
     // Captura traces solo si fallan para no inflar el tamaño de los blobs.
-    trace: "retain-on-failure",
-    video: "on-first-retry",
-    screenshot: "only-on-failure",
+    trace: "on",
+    video: "on",
+    screenshot: "on",
 
     // baseURL: process.env.BASE_URL || "http://localhost:3000",
   },

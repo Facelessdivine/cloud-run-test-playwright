@@ -128,6 +128,11 @@ EOF
 import { uploadFile } from '/app/scripts/gcs.js';
 await uploadFile("${BUCKET_NAME}", "./results.xml", "runs/${RUN_ID}/final/junit.xml");
 EOF
+  echo "📤 Deleting blob files..."
+  node <<EOF
+import { deleteFile } from '/app/scripts/gcs.js';
+await deleteFile("${BUCKET_NAME}", "runs/${RUN_ID}/blob");
+EOF
 
   echo "===================================================="
   echo "✅ MERGE COMPLETED"
