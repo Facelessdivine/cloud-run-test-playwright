@@ -133,6 +133,15 @@ EOF
 import { deleteFile } from '/app/scripts/gcs.js';
 await deleteFile("${BUCKET_NAME}", "runs/${RUN_ID}/blob");
 EOF
+############################################
+# 4) Cleanup blob artifacts
+############################################
+
+echo "🧹 Cleaning up shard blobs..."
+node <<EOF
+import { deletePrefix } from '/app/scripts/gcs.js';
+await deletePrefix("${BUCKET_NAME}", "runs/${RUN_ID}/blob/");
+EOF
 
   echo "===================================================="
   echo "✅ MERGE COMPLETED"
