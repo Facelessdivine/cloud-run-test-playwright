@@ -144,6 +144,7 @@ EOF
   echo "🔗 HTML:  gs://${BUCKET_NAME}/runs/${RUN_ID}/final/html/index.html"
   echo "🔗 JUnit: gs://${BUCKET_NAME}/runs/${RUN_ID}/final/junit.xml"
   echo "===================================================="
+  echo "HTML Report: https://storage.googleapis.com/${BUCKET_NAME}/runs/${RUN_ID}/final/html/index.html"
 else
   echo "Shard ${IDX}/${CNT} finished — merge handled by shard 1."
 fi
