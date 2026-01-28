@@ -47,7 +47,7 @@ export async function downloadPrefix(bucketName, prefix, destDir) {
     console.log("Downloaded:", f.name);
   }
 }
-
+//change
 export async function countShardFolders(bucketName, runId) {
   const [files] = await storage
     .bucket(bucketName)
