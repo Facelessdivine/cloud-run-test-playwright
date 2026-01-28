@@ -30,9 +30,9 @@ upload_dir() {
   local dest="$2"
 
   node <<EOF
-const { Storage } = require('@google-cloud/storage');
-const fs = require('fs');
-const path = require('path');
+import { Storage } from '@google-cloud/storage';
+import fs from 'fs';
+import path from 'path';
 
 const bucketName = "${BUCKET_NAME}";
 const prefix = "${dest}";
@@ -44,15 +44,13 @@ function walk(dir) {
   );
 }
 
-(async () => {
-  const files = walk("${src}");
-  for (const f of files) {
-    const rel = path.relative("${src}", f);
-    const destPath = prefix + '/' + rel;
-    await storage.bucket(bucketName).upload(f, { destination: destPath });
-    console.log("Uploaded:", destPath);
-  }
-})();
+const files = walk("${src}");
+for (const f of files) {
+  const rel = path.relative("${src}", f);
+  const destPath = prefix + '/' + rel;
+  await storage.bucket(bucketName).upload(f, { destination: destPath });
+  console.log("Uploaded:", destPath);
+}
 EOF
 }
 
@@ -65,25 +63,23 @@ download_prefix() {
   local dest="$2"
 
   node <<EOF
-const { Storage } = require('@google-cloud/storage');
-const fs = require('fs');
-const path = require('path');
+import { Storage } from '@google-cloud/storage';
+import fs from 'fs';
+import path from 'path';
 
 const bucketName = "${BUCKET_NAME}";
 const prefix = "${prefix}";
 const dest = "${dest}";
 const storage = new Storage();
 
-(async () => {
-  const [files] = await storage.bucket(bucketName).getFiles({ prefix });
-  for (const f of files) {
-    if (f.name.endsWith('/')) continue;
-    const out = path.join(dest, f.name.replace(prefix, ''));
-    fs.mkdirSync(path.dirname(out), { recursive: true });
-    await f.download({ destination: out });
-    console.log("Downloaded:", f.name);
-  }
-})();
+const [files] = await storage.bucket(bucketName).getFiles({ prefix });
+for (const f of files) {
+  if (f.name.endsWith('/')) continue;
+  const out = path.join(dest, f.name.replace(prefix, ''));
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  await f.download({ destination: out });
+  console.log("Downloaded:", f.name);
+}
 EOF
 }
 
@@ -123,7 +119,7 @@ if [[ "$IDX" -eq 1 ]]; then
   while true; do
     echo "🔍 Checking shard folders..."
     shard_count=$(node <<EOF
-const { Storage } = require('@google-cloud/storage');
+import { Storage } from '@google-cloud/storage';
 const storage = new Storage();
 const [files] = await storage.bucket("${BUCKET_NAME}")
   .getFiles({ prefix: "runs/${RUN_ID}/blob/shard-" });
@@ -186,7 +182,7 @@ EOF
 
   echo "📤 Uploading merged JUnit..."
   node <<EOF
-const { Storage } = require('@google-cloud/storage');
+import { Storage } from '@google-cloud/storage';
 const storage = new Storage();
 await storage.bucket("${BUCKET_NAME}")
   .upload("./results.xml", { destination: "runs/${RUN_ID}/final/junit.xml" });
