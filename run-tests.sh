@@ -2,11 +2,6 @@
 set -euo pipefail
 
 ############################################
-# Ensure Node can resolve deps from /app
-############################################
-export NODE_PATH=/app/node_modules
-
-############################################
 # Shard info from Cloud Run Jobs
 ############################################
 
@@ -19,6 +14,9 @@ BUCKET=${BUCKET:?ERROR: BUCKET env var is required}
 BUCKET="$(echo -n "$BUCKET" | xargs)"
 [[ "$BUCKET" != gs://* ]] && BUCKET="gs://${BUCKET}"
 BUCKET_NAME="${BUCKET#gs://}"
+
+# 🔑 REQUIRED so Node can resolve deps when we cd /merge
+export NODE_PATH=/app/node_modules
 
 echo "===================================================="
 echo "🚀 Playwright shard ${IDX}/${CNT}"
@@ -126,8 +124,10 @@ if [[ "$IDX" -eq 1 ]]; then
     shard_count=$(node --input-type=module <<EOF
 import { Storage } from '@google-cloud/storage';
 const storage = new Storage();
+
 const [files] = await storage.bucket("${BUCKET_NAME}")
   .getFiles({ prefix: "runs/${RUN_ID}/blob/shard-" });
+
 const shards = new Set(files.map(f => f.name.split('/')[3]));
 console.log(shards.size);
 EOF
@@ -189,8 +189,10 @@ EOF
   node --input-type=module <<EOF
 import { Storage } from '@google-cloud/storage';
 const storage = new Storage();
+
 await storage.bucket("${BUCKET_NAME}")
   .upload("./results.xml", { destination: "runs/${RUN_ID}/final/junit.xml" });
+
 console.log("Uploaded results.xml");
 EOF
 
