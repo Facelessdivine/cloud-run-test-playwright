@@ -7,7 +7,7 @@ set -euo pipefail
 
 IDX=$(( ${CLOUD_RUN_TASK_INDEX:-0} + 1 ))
 CNT=${CLOUD_RUN_TASK_COUNT:-1}
-
+BUCKET="pw-artifacts-demo-1763046256"
 RUN_ID=${RUN_ID:-${CLOUD_RUN_EXECUTION:-$(date -u +%Y%m%dT%H%M%SZ)}}
 BUCKET=${BUCKET:?ERROR: BUCKET env var is required}
 
