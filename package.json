@@ -3,15 +3,9 @@
   "private": true,
   "scripts": {
     "test": "playwright test",
-    "test:ci": "bash ./run-tests.sh",
-    "report:merge": "bash ./merge-reports.sh"
+    "test:ci": "bash ./run-tests.sh"
   },
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "type": "module",
   "devDependencies": {
     "@playwright/test": "^1.56.1",
