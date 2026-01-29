@@ -2,8 +2,7 @@
   "name": "pw-cloud-run-demo",
   "private": true,
   "scripts": {
-    "test": "playwright test",
-    "test:ci": "bash ./run-tests.sh"
+    "test": "playwright test"
   },
   "version": "1.0.0",
   "type": "module",
@@ -11,7 +10,5 @@
     "@playwright/test": "^1.56.1",
     "@types/node": "^24.10.1"
   },
-  "dependencies": {
-    "@google-cloud/storage": "^7.18.0"
-  }
+  "dependencies": {}
 }
